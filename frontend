@@ -1,0 +1,231 @@
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+import java.awt.*;
+import java.awt.event.*;
+import java.sql.*;
+
+public class ProjectTracker extends JFrame {
+    // GUI Components
+    private JTextField txtName, txtLocation, txtBudget, txtStartDate, txtEndDate, txtStatus;
+    private JTable table;
+    private DefaultTableModel model;
+
+    public ProjectTracker() {
+        setTitle("Construction Project Tracker");
+        setSize(950, 600);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setLocationRelativeTo(null);
+        setLayout(new BorderLayout(10, 10));
+
+        // ====== NORTH PANEL (Title) ======
+        JLabel title = new JLabel("Construction Project Tracker", SwingConstants.CENTER);
+        title.setFont(new Font("Times New Roman", Font.BOLD, 22));
+        add(title, BorderLayout.NORTH);
+
+        // ====== CENTER PANEL (Form + Table) ======
+        JPanel centerPanel = new JPanel(new BorderLayout(10, 10));
+
+        // ---------- Input Form ----------
+        JPanel formPanel = new JPanel(new GridLayout(6, 2, 10, 10));
+        formPanel.setBorder(BorderFactory.createTitledBorder("Project Details"));
+
+        formPanel.add(new JLabel("Project Name:"));
+        txtName = new JTextField();
+        formPanel.add(txtName);
+
+        formPanel.add(new JLabel("Location:"));
+        txtLocation = new JTextField();
+        formPanel.add(txtLocation);
+
+        formPanel.add(new JLabel("Budget:"));
+        txtBudget = new JTextField();
+        formPanel.add(txtBudget);
+
+        formPanel.add(new JLabel("Start Date (YYYY-MM-DD):"));
+        txtStartDate = new JTextField();
+        formPanel.add(txtStartDate);
+
+        formPanel.add(new JLabel("End Date (YYYY-MM-DD):"));
+        txtEndDate = new JTextField();
+        formPanel.add(txtEndDate);
+
+        formPanel.add(new JLabel("Status:"));
+        txtStatus = new JTextField();
+        formPanel.add(txtStatus);
+
+        centerPanel.add(formPanel, BorderLayout.NORTH);
+
+        // ---------- Table ----------
+        String[] columns = {"ID", "Project Name", "Location", "Budget", "Start Date", "End Date", "Status"};
+        model = new DefaultTableModel(columns, 0);
+        table = new JTable(model);
+        JScrollPane scrollPane = new JScrollPane(table);
+        centerPanel.add(scrollPane, BorderLayout.CENTER);
+
+        add(centerPanel, BorderLayout.CENTER);
+
+        // ====== SOUTH PANEL (Buttons) ======
+        JPanel buttonPanel = new JPanel();
+
+        JButton btnAdd = new JButton("Add");
+        JButton btnView = new JButton("View");
+        JButton btnUpdate = new JButton("Update");
+        JButton btnDelete = new JButton("Delete");
+        JButton btnClear = new JButton("Clear");
+
+        buttonPanel.add(btnAdd);
+        buttonPanel.add(btnView);
+        buttonPanel.add(btnUpdate);
+        buttonPanel.add(btnDelete);
+        buttonPanel.add(btnClear);
+
+        add(buttonPanel, BorderLayout.SOUTH);
+
+        // ====== BUTTON ACTIONS ======
+
+        // Add Project
+        btnAdd.addActionListener(e -> addProject());
+
+        // View Projects
+        btnView.addActionListener(e -> viewProjects());
+
+        // Update Project
+        btnUpdate.addActionListener(e -> updateProject());
+
+        // Delete Project
+        btnDelete.addActionListener(e -> deleteProject());
+
+        // Clear Fields
+        btnClear.addActionListener(e -> clearFields());
+
+        setVisible(true);
+    }
+
+    // ========== METHOD: Add Project ==========
+    private void addProject() {
+        String name = txtName.getText();
+        String location = txtLocation.getText();
+        String budget = txtBudget.getText();
+        String start = txtStartDate.getText();
+        String end = txtEndDate.getText();
+        String status = txtStatus.getText();
+
+        try (Connection conn = DBConnection.getConnection()) {
+            String sql = "INSERT INTO projects (project_name, location, budget, start_date, end_date, status) VALUES (?, ?, ?, ?, ?, ?)";
+            PreparedStatement ps = conn.prepareStatement(sql);
+            ps.setString(1, name);
+            ps.setString(2, location);
+            ps.setDouble(3, Double.parseDouble(budget));
+            ps.setString(4, start);
+            ps.setString(5, end);
+            ps.setString(6, status);
+            ps.executeUpdate();
+
+            JOptionPane.showMessageDialog(this, "Project Added Successfully!");
+            clearFields();
+            viewProjects();
+
+        } catch (SQLException ex) {
+            JOptionPane.showMessageDialog(this, "Error adding project: " + ex.getMessage());
+        }
+    }
+
+    // ========== METHOD: View Projects ==========
+    private void viewProjects() {
+        model.setRowCount(0);
+        try (Connection conn = DBConnection.getConnection()) {
+            String sql = "SELECT * FROM projects";
+            Statement stmt = conn.createStatement();
+            ResultSet rs = stmt.executeQuery(sql);
+
+            while (rs.next()) {
+                Object[] row = {
+                        rs.getInt("id"),
+                        rs.getString("project_name"),
+                        rs.getString("location"),
+                        rs.getDouble("budget"),
+                        rs.getDate("start_date"),
+                        rs.getDate("end_date"),
+                        rs.getString("status")
+                };
+                model.addRow(row);
+            }
+        } catch (SQLException ex) {
+            JOptionPane.showMessageDialog(this, "Error viewing projects: " + ex.getMessage());
+        }
+    }
+
+    // ========== METHOD: Update Project ==========
+    private void updateProject() {
+        int selectedRow = table.getSelectedRow();
+        if (selectedRow == -1) {
+            JOptionPane.showMessageDialog(this, "Please select a project to update.");
+            return;
+        }
+
+        int id = (int) model.getValueAt(selectedRow, 0);
+        String name = txtName.getText();
+        String location = txtLocation.getText();
+        String budget = txtBudget.getText();
+        String start = txtStartDate.getText();
+        String end = txtEndDate.getText();
+        String status = txtStatus.getText();
+
+        try (Connection conn = DBConnection.getConnection()) {
+            String sql = "UPDATE projects SET project_name=?, location=?, budget=?, start_date=?, end_date=?, status=? WHERE id=?";
+            PreparedStatement ps = conn.prepareStatement(sql);
+            ps.setString(1, name);
+            ps.setString(2, location);
+            ps.setDouble(3, Double.parseDouble(budget));
+            ps.setString(4, start);
+            ps.setString(5, end);
+            ps.setString(6, status);
+            ps.setInt(7, id);
+            ps.executeUpdate();
+
+            JOptionPane.showMessageDialog(this, "Project Updated Successfully!");
+            viewProjects();
+
+        } catch (SQLException ex) {
+            JOptionPane.showMessageDialog(this, "Error updating project: " + ex.getMessage());
+        }
+    }
+
+    // ========== METHOD: Delete Project ==========
+    private void deleteProject() {
+        int selectedRow = table.getSelectedRow();
+        if (selectedRow == -1) {
+            JOptionPane.showMessageDialog(this, "Please select a project to delete.");
+            return;
+        }
+
+        int id = (int) model.getValueAt(selectedRow, 0);
+        try (Connection conn = DBConnection.getConnection()) {
+            String sql = "DELETE FROM projects WHERE id=?";
+            PreparedStatement ps = conn.prepareStatement(sql);
+            ps.setInt(1, id);
+            ps.executeUpdate();
+
+            JOptionPane.showMessageDialog(this, "Project Deleted Successfully!");
+            viewProjects();
+
+        } catch (SQLException ex) {
+            JOptionPane.showMessageDialog(this, "Error deleting project: " + ex.getMessage());
+        }
+    }
+
+    // ========== METHOD: Clear Fields ==========
+    private void clearFields() {
+        txtName.setText("");
+        txtLocation.setText("");
+        txtBudget.setText("");
+        txtStartDate.setText("");
+        txtEndDate.setText("");
+        txtStatus.setText("");
+    }
+
+    // ========== MAIN METHOD ==========
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(ProjectTracker::new);
+    }
+}
